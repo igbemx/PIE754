@@ -1,4 +1,4 @@
-# GalilShutterDS
+# PI E-754 controller tango device 
 
-Tango device for the Galil controller based shutter.
+Tango device for PI E-754 controller.
 
