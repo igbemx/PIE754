@@ -6,8 +6,6 @@ setup(
     use_scm_version=True,
     setup_requires=["setuptools_scm"],
     description="Device server for the PI E754 motion controller at Softimax",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
     author="Igor Beinik",
     author_email="igor.beinik@maxiv.lu.se",
     license="GPLv3",
