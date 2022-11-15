@@ -131,11 +131,6 @@ class SoftiPIE754(Device):
         hw_memorized=True,
     )
 
-    Acceleration = attribute(
-        dtype='DevDouble',
-        access=AttrWriteType.READ_WRITE,
-    )
-
     # ---------------
     # General methods
     # ---------------
@@ -290,27 +285,6 @@ class SoftiPIE754(Device):
         """Set the PosTolerance attribute."""
         self.__pos_tolerance = value
         # PROTECTED REGION END #    //  SoftiPIE754.PosTolerance_write
-
-    def read_Acceleration(self):
-        # PROTECTED REGION ID(SoftiPIE754.Acceleration_read) ENABLED START #
-        """Return the Acceleration attribute."""
-        try:
-            self.__acceleration = self.pi_ctrl.qACC()['1']
-            print('The acceleration is: ', self.__acceleration)
-            return self.__acceleration
-        except BaseException as e:
-            print('Problem setting the acceleration, the error is: ', e)
-        # PROTECTED REGION END #    //  SoftiPIE754.Acceleration_read
-
-    def write_Acceleration(self, value):
-        # PROTECTED REGION ID(SoftiPIE754.Acceleration_write) ENABLED START #
-        """Set the Acceleration attribute."""
-        # try:
-        #     self.pi_ctrl.ACC('1', value)
-        # except BaseException as e:
-        #     print('Problem setting the acceleration, the error is: ', e)
-        pass
-        # PROTECTED REGION END #    //  SoftiPIE754.Acceleration_write
 
     # --------
     # Commands
