@@ -49,19 +49,7 @@ class SoftiPIE754(Device):
     # PROTECTED REGION ID(SoftiPIE754.class_variable) ENABLED START #
 
     def read_attr_hardware(self, attrs):
-        try:
-            self.__dial_position = self.pi_ctrl.qPOS()['1']
-            self.__pos_error = self.__dial_position - self._req_pos
-            self.__position = self.sign * (self.__dial_position + self.offset)
-            in_motion = self.__pos_error > self.__pos_tolerance
-            st = self.get_state()
-            if in_motion and st not in [DevState.FAULT, DevState.OFF]:
-                self.set_state(DevState.MOVING)
-            elif st not in [DevState.FAULT, DevState.OFF]:
-                self.set_state(DevState.ON)
-        except BaseException as e:
-            self.set_state(DevState.FAULT)
-            print(e)
+        pass
 
     # PROTECTED REGION END #    //  SoftiPIE754.class_variable
 
@@ -172,6 +160,19 @@ class SoftiPIE754(Device):
     def always_executed_hook(self):
         """Method always executed before any TANGO command is executed."""
         # PROTECTED REGION ID(SoftiPIE754.always_executed_hook) ENABLED START #
+        try:
+            self.__dial_position = self.pi_ctrl.qPOS()['1']
+            self.__pos_error = self.__dial_position - self._req_pos
+            self.__position = self.sign * (self.__dial_position + self.offset)
+            in_motion = abs(self.__pos_error) > self.__pos_tolerance
+            st = self.get_state()
+            if in_motion and st not in [DevState.FAULT, DevState.OFF]:
+                self.set_state(DevState.MOVING)
+            elif st not in [DevState.FAULT, DevState.OFF]:
+                self.set_state(DevState.ON)
+        except BaseException as e:
+            self.set_state(DevState.FAULT)
+            print(e)
         # PROTECTED REGION END #    //  SoftiPIE754.always_executed_hook
 
     def delete_device(self):
