@@ -157,9 +157,9 @@ class SoftiPIE754(Device):
             print(e)
         # PROTECTED REGION END #    //  SoftiPIE754.init_device
 
-    def always_executed_hook(self):
-        """Method always executed before any TANGO command is executed."""
-        # PROTECTED REGION ID(SoftiPIE754.always_executed_hook) ENABLED START #
+    def read_attr_hardware(self, attrs):
+        """ Method to read hardware attributes"""
+        # PROTECTED REGION ID(SoftiPIE754.read_attr_hardware) ENABLED START #
         try:
             self.__dial_position = self.pi_ctrl.qPOS()['1']
             self.__pos_error = self.__dial_position - self._req_pos
@@ -173,6 +173,12 @@ class SoftiPIE754(Device):
         except BaseException as e:
             self.set_state(DevState.FAULT)
             print(e)
+        # PROTECTED REGION END #    //  SoftiPIE754.read_attr_hardware
+
+    def always_executed_hook(self):
+        """Method always executed before any TANGO command is executed."""
+        # PROTECTED REGION ID(SoftiPIE754.always_executed_hook) ENABLED START #
+        pass
         # PROTECTED REGION END #    //  SoftiPIE754.always_executed_hook
 
     def delete_device(self):
@@ -199,6 +205,7 @@ class SoftiPIE754(Device):
     def write_Position(self, value):
         # PROTECTED REGION ID(SoftiPIE754.Position_write) ENABLED START #
         """Set the Position attribute."""
+        self.set_state(DevState.MOVING)
         self.write_DialPosition(self.sign * value - self.offset)
         # PROTECTED REGION END #    //  SoftiPIE754.Position_write
 
@@ -230,9 +237,9 @@ class SoftiPIE754(Device):
     def write_DialPosition(self, value):
         # PROTECTED REGION ID(SoftiPIE754.DialPosition_write) ENABLED START #
         """Set the DialPosition attribute."""
+        self.set_state(DevState.MOVING)
         try:
             self._req_pos = value
-            self.set_state(DevState.MOVING)
             self.pi_ctrl.MOV('1', value)
         except BaseException as e:
             self.set_state(DevState.FAULT)
