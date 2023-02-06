@@ -13,7 +13,7 @@ setup(
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     python_requires=">=3.6",
-    install_requires=['pytango',],
+    install_requires=['pytango', 'pipython'],
     entry_points={
         'console_scripts': [
             'SoftiPIE754 = SoftiPIE754.SoftiPIE754:main',
