@@ -23,6 +23,7 @@ from tango import AttrQuality, DispLevel, DevState
 from tango import AttrWriteType, PipeWriteType
 # Additional import
 # PROTECTED REGION ID(SoftiPIE754.additionnal_import) ENABLED START #
+from pipython import GCSDevice, pitools
 # PROTECTED REGION END #    //  SoftiPIE754.additionnal_import
 
 __all__ = ["SoftiPIE754", "main"]
@@ -46,6 +47,10 @@ class SoftiPIE754(Device):
             - Type:'DevString'
     """
     # PROTECTED REGION ID(SoftiPIE754.class_variable) ENABLED START #
+
+    def read_attr_hardware(self, attrs):
+        pass
+
     # PROTECTED REGION END #    //  SoftiPIE754.class_variable
 
     # -----------------
@@ -114,11 +119,6 @@ class SoftiPIE754(Device):
         hw_memorized=True,
     )
 
-    Acceleration = attribute(
-        dtype='DevDouble',
-        access=AttrWriteType.READ_WRITE,
-    )
-
     # ---------------
     # General methods
     # ---------------
@@ -133,13 +133,52 @@ class SoftiPIE754(Device):
         self.__on_target = False
         self.__servo_on = False
         self.__pos_error = 0.0
-        self.__pos_tolerance = 0.0
-        self.__acceleration = 0.0
+        self.__acceleration = 10000
+        self.__pos_tolerance = 0.1
+
+        self.pi_ctrl = GCSDevice('E-754')
+
+        try:
+            if self.ctrl_host:
+                self.pi_ctrl.ConnectTCPIP(ipaddress=self.ctrl_host)
+                print(f'PI-E754 controller for axis {self.axis_name} is connected, IP: {self.ctrl_host}')
+                print('initialize connected stage...')
+                pitools.startup(self.pi_ctrl)
+
+                self._rangemin = self.pi_ctrl.qTMN()['1']
+                self._rangemax = self.pi_ctrl.qTMX()['1']
+                self.__dial_position = self.pi_ctrl.qPOS()['1']
+                self._req_pos = self.__dial_position
+                print(f'MIN {self.axis_name} dial position: {self._rangemin}, MAX {self.axis_name} dial position: {self._rangemax}')
+                print(f'Current {self.axis_name} dial position is {self.__dial_position}')
+            self.set_state(DevState.ON)
+        except BaseException as e:
+            self.set_state(DevState.FAULT)
+            print(e)
         # PROTECTED REGION END #    //  SoftiPIE754.init_device
+
+    def read_attr_hardware(self, attrs):
+        """ Method to read hardware attributes"""
+        # PROTECTED REGION ID(SoftiPIE754.read_attr_hardware) ENABLED START #
+        try:
+            self.__dial_position = self.pi_ctrl.qPOS()['1']
+            self.__pos_error = self.__dial_position - self._req_pos
+            self.__position = self.sign * (self.__dial_position + self.offset)
+            in_motion = abs(self.__pos_error) > self.__pos_tolerance
+            st = self.get_state()
+            if in_motion and st not in [DevState.FAULT, DevState.OFF]:
+                self.set_state(DevState.MOVING)
+            elif st not in [DevState.FAULT, DevState.OFF]:
+                self.set_state(DevState.ON)
+        except BaseException as e:
+            self.set_state(DevState.FAULT)
+            print(e)
+        # PROTECTED REGION END #    //  SoftiPIE754.read_attr_hardware
 
     def always_executed_hook(self):
         """Method always executed before any TANGO command is executed."""
         # PROTECTED REGION ID(SoftiPIE754.always_executed_hook) ENABLED START #
+        pass
         # PROTECTED REGION END #    //  SoftiPIE754.always_executed_hook
 
     def delete_device(self):
@@ -150,6 +189,8 @@ class SoftiPIE754(Device):
         destructor and by the device Init command.
         """
         # PROTECTED REGION ID(SoftiPIE754.delete_device) ENABLED START #
+        self.pi_ctrl.close()
+        print('Controller disconnected.')
         # PROTECTED REGION END #    //  SoftiPIE754.delete_device
     # ------------------
     # Attributes methods
@@ -164,19 +205,27 @@ class SoftiPIE754(Device):
     def write_Position(self, value):
         # PROTECTED REGION ID(SoftiPIE754.Position_write) ENABLED START #
         """Set the Position attribute."""
-        pass
+        self.set_state(DevState.MOVING)
+        self.write_DialPosition(self.sign * value - self.offset)
         # PROTECTED REGION END #    //  SoftiPIE754.Position_write
 
     def read_Velocity(self):
         # PROTECTED REGION ID(SoftiPIE754.Velocity_read) ENABLED START #
         """Return the Velocity attribute."""
-        return self.__velocity
+        try:
+            self.__velocity = self.pi_ctrl.qVEL()['1']
+            return self.__velocity
+        except BaseException as e:
+            print('Problem reading the velocity, the error is: ', e)
         # PROTECTED REGION END #    //  SoftiPIE754.Velocity_read
 
     def write_Velocity(self, value):
         # PROTECTED REGION ID(SoftiPIE754.Velocity_write) ENABLED START #
         """Set the Velocity attribute."""
-        pass
+        try:
+            self.pi_ctrl.VEL('1', value)
+        except BaseException as e:
+            print('Problem setting the velocity, the error is: ', e)
         # PROTECTED REGION END #    //  SoftiPIE754.Velocity_write
 
     def read_DialPosition(self):
@@ -188,25 +237,43 @@ class SoftiPIE754(Device):
     def write_DialPosition(self, value):
         # PROTECTED REGION ID(SoftiPIE754.DialPosition_write) ENABLED START #
         """Set the DialPosition attribute."""
-        pass
+        self.set_state(DevState.MOVING)
+        try:
+            self._req_pos = value
+            self.pi_ctrl.MOV('1', value)
+        except BaseException as e:
+            self.set_state(DevState.FAULT)
+            self.set_status(f'Problem moving the stage: {e}')
         # PROTECTED REGION END #    //  SoftiPIE754.DialPosition_write
 
     def read_OnTarget(self):
         # PROTECTED REGION ID(SoftiPIE754.OnTarget_read) ENABLED START #
         """Return the OnTarget attribute."""
-        return self.__on_target
+        try:
+            self.__on_target = self.pi_ctrl.qONT()['1']
+            return self.__on_target
+        except BaseException as e:
+            self.set_state(DevState.FAULT)
         # PROTECTED REGION END #    //  SoftiPIE754.OnTarget_read
 
     def read_ServoOn(self):
         # PROTECTED REGION ID(SoftiPIE754.ServoOn_read) ENABLED START #
         """Return the ServoOn attribute."""
-        return self.__servo_on
+        try:
+            self.__servo_on = self.pi_ctrl.qSVO()['1']
+            return self.__servo_on
+        except BaseException as e:
+            print('Problem reading the servo state, the error is: ', e)
         # PROTECTED REGION END #    //  SoftiPIE754.ServoOn_read
 
     def write_ServoOn(self, value):
         # PROTECTED REGION ID(SoftiPIE754.ServoOn_write) ENABLED START #
         """Set the ServoOn attribute."""
-        pass
+        try:
+            self.pi_ctrl.SVO('1', value)
+        except BaseException as e:
+            self.set_state(DevState.FAULT)
+            print('Problem changing the servo state, the error is: ', e)
         # PROTECTED REGION END #    //  SoftiPIE754.ServoOn_write
 
     def read_PosError(self):
@@ -224,20 +291,8 @@ class SoftiPIE754(Device):
     def write_PosTolerance(self, value):
         # PROTECTED REGION ID(SoftiPIE754.PosTolerance_write) ENABLED START #
         """Set the PosTolerance attribute."""
-        pass
+        self.__pos_tolerance = value
         # PROTECTED REGION END #    //  SoftiPIE754.PosTolerance_write
-
-    def read_Acceleration(self):
-        # PROTECTED REGION ID(SoftiPIE754.Acceleration_read) ENABLED START #
-        """Return the Acceleration attribute."""
-        return self.__acceleration
-        # PROTECTED REGION END #    //  SoftiPIE754.Acceleration_read
-
-    def write_Acceleration(self, value):
-        # PROTECTED REGION ID(SoftiPIE754.Acceleration_write) ENABLED START #
-        """Set the Acceleration attribute."""
-        pass
-        # PROTECTED REGION END #    //  SoftiPIE754.Acceleration_write
 
     # --------
     # Commands
@@ -249,12 +304,9 @@ class SoftiPIE754(Device):
     @DebugIt()
     def GetIDN(self):
         # PROTECTED REGION ID(SoftiPIE754.GetIDN) ENABLED START #
-        """
-        Gets the IDN of the connected controllers.
-
-        :return:'DevString'
-        """
-        return ""
+        if self.ctrl_host:
+            resp = self.pi_ctrl.qIDN()
+        return f'PI E-754 controller {self.axis_name} axis IDN is: ' + resp
         # PROTECTED REGION END #    //  SoftiPIE754.GetIDN
 
     @command(
@@ -281,7 +333,8 @@ class SoftiPIE754(Device):
 
         :return:None
         """
-        pass
+        self.set_state(DevState.ON)
+        self.set_status('The device is in ON state.')
         # PROTECTED REGION END #    //  SoftiPIE754.AcknError
 
 # ----------
